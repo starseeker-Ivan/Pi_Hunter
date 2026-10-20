@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>π Hunter — find your phrase in the digits of pi</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%230d1330'/%3E%3Cpath d='M20 20h24M32 20v24M26 44h12' stroke='%23f2c96b' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+/* ============ tokens ============ */
+:root{
+  --bg:#0a0f26;
+  --bg2:#0d1330;
+  --panel:#121a3d;
+  --panel2:#18234b;
+  --line:#2b3a6b;
+  --ink:#eef1ff;
+  --muted:#9aa7d8;
+  --gold:#f2c96b;
+  --violet:#a78bfa;
+  --ok:#7ee2a8;
+  --warn:#f0a868;
+  --font:"Space Grotesk","PingFang SC","Noto Sans SC",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+}
+html.bw{
+  --bg:#f5f5f5; --bg2:#ffffff; --panel:#ffffff; --panel2:#eeeeee;
+  --line:#cccccc; --ink:#111111; --muted:#555555;
+  --gold:#000000; --violet:#444444; --ok:#006633; --warn:#994400;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, var(--bg2) 0%, var(--bg) 55%),
+    var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+html.bw body{
+  background:var(--bg);
+}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 56px}
+/* starfield texture (decorative layer, aria-hidden) */
+.sky{position:fixed;inset:0;pointer-events:none;z-index:0;background-image:
+  radial-gradient(1px 1px at 12% 22%, rgba(255,255,255,.5) 0, transparent 100%),
+  radial-gradient(1px 1px at 68% 12%, rgba(255,255,255,.4) 0, transparent 100%),
+  radial-gradient(1.5px 1.5px at 84% 64%, rgba(255,255,255,.35) 0, transparent 100%),
+  radial-gradient(1px 1px at 38% 78%, rgba(255,255,255,.4) 0, transparent 100%),
+  radial-gradient(1px 1px at 24% 46%, rgba(255,255,255,.3) 0, transparent 100%);opacity:.5}
+html.bw .sky{display:none}
+/* ============ masthead ============ */
+.mast{position:relative;z-index:1;text-align:center;padding:34px 0 6px}
+.logo{display:inline-flex;align-items:baseline;gap:10px}
+.logo .pi{font-size:64px;line-height:1;color:var(--gold);font-weight:700}
+.logo .word{font-size:26px;font-weight:600;letter-spacing:.28em;text-transform:uppercase}
+.mast .sub{max-width:520px;margin:10px auto 0;color:var(--muted);font-size:14px}
+.badge{display:inline-block;margin-top:12px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px;letter-spacing:.12em}
+/* ============ control card ============ */
+.card{position:relative;z-index:1;margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.hunt{display:flex;flex-direction:column;gap:10px}
+.inputrow{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+#phrase{
+  flex:1 1 240px;min-width:0;
+  font-family:var(--mono);font-size:16px;
+  padding:12px 14px;border-radius:10px;border:1px solid var(--line);
+  background:var(--bg2);color:var(--ink);outline:none;
+}
+#phrase:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(242,201,107,.18)}
+.btn{
+  font-family:var(--font);font-weight:600;font-size:15px;
+  padding:12px 20px;border-radius:10px;border:1px solid transparent;cursor:pointer;
+  background:var(--gold);color:#141a30;min-height:48px;min-width:128px;
+  transition:transform .15s ease,filter .15s ease;
+}
+.btn:active{transform:translateY(1px) scale(.99)}
+.btn.secondary{background:transparent;border-color:var(--line);color:var(--ink)}
+.btn.secondary:hover{border-color:var(--gold)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+html.bw .btn{background:#111;color:#fff}
+.row2{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{
+  font-family:var(--font);font-size:13px;padding:9px 12px;background:transparent;
+  border:0;color:var(--muted);cursor:pointer;min-height:44px;
+}
+.seg button[aria-pressed="true"]{background:var(--gold);color:#141a30;font-weight:600}
+html.bw .seg button[aria-pressed="true"]{background:#111;color:#fff}
+.hint{font-size:12px;color:var(--muted);line-height:1.6}
+.hint code{font-family:var(--mono);background:var(--bg2);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+.resolved{margin-top:10px;font-family:var(--mono);font-size:13px;color:var(--gold);word-break:break-all;display:none}
+#target-inline{color:var(--gold);font-weight:600}
+/* ============ stats ============ */
+.stats{position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat .k{font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.stat .v{font-family:var(--mono);font-size:22px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:12px;color:var(--muted);font-weight:400}
+/* ============ stream ============ */
+.ticker{position:relative;z-index:1;margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
+.ticker .cap{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+.ticker .cap b{font-family:var(--mono);font-size:13px}
+.ticker .cap .st{font-size:12px;color:var(--muted)}
+.stream{
+  display:grid;grid-template-columns:repeat(12,1fr);gap:4px;
+  max-height:38vh;overflow-y:auto;overscroll-behavior:contain;
+  padding:2px 2px 6px;
+  position:relative;
+}
+.tile{
+  font-family:var(--mono);font-size:16px;line-height:1;text-align:center;
+  aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:4px;background:rgba(255,255,255,.045);color:var(--ink);
+  font-variant-numeric:tabular-nums;min-width:0;
+}
+.tile .ltr{font-size:9px;color:var(--violet);line-height:1;margin-top:2px;font-family:var(--font);font-weight:600}
+html.bw .tile{background:#fff;color:#000}
+html.bw .tile:nth-child(odd){background:#000;color:#fff}
+.tile.found{background:var(--gold);color:#141a30;box-shadow:0 0 0 1px var(--gold),0 0 18px rgba(242,201,107,.55);animation:pulse 1.1s ease-in-out infinite}
+html.bw .tile.found{background:#111;color:#fff;box-shadow:0 0 0 2px #111;animation:none}
+@keyframes pulse{50%{box-shadow:0 0 0 1px var(--gold),0 0 34px rgba(242,201,107,.9)}}
+.scan{position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.7;pointer-events:none;z-index:2;display:none}
+body.running .scan{display:block;animation:scan 2.4s linear infinite}
+@keyframes scan{0%{transform:translateY(0)}100%{transform:translateY(100%)}}
+.scan{transform:translateY(var(--scan-y,0))}
+@media (prefers-reduced-motion:reduce){
+  .scan,body.running .scan{display:none}
+  .tile.found{animation:none}
+  html{scroll-behavior:auto}
+}
+/* ============ result panel ============ */
+.result{position:relative;z-index:1;margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;display:none}
+.result.on{display:block;animation:rise .45s var(--ease,ease)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.result .head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.result .hl{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--gold);line-height:1.1}
+.result .hl small{font-size:13px;color:var(--muted);font-weight:400;display:block;margin-top:4px}
+.snippet{font-family:var(--mono);font-size:15px;margin-top:14px;line-height:2.2;word-break:break-all;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px}
+.snippet .hit{background:var(--gold);color:#141a30;font-weight:700;padding:2px 6px;border-radius:6px}
+html.bw .snippet .hit{background:#111;color:#fff}
+.result .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+/* ============ footer ============ */
+.foot{position:relative;z-index:1;margin-top:26px;color:var(--muted);font-size:12.5px;line-height:1.7}
+.foot .rule{border-top:1px solid var(--line);margin:14px 0;padding-top:12px}
+.foot code{font-family:var(--mono)}
+@media (min-width:768px){
+  .wrap{padding:28px 24px 64px}
+  .logo .pi{font-size:86px}
+  .logo .word{font-size:34px}
+  .hunt{flex-direction:row}
+  .row2{justify-content:flex-start;gap:14px}
+  .stats{grid-template-columns:repeat(4,1fr)}
+  .stream{grid-template-columns:repeat(24,1fr)}
+  .hint{max-width:340px;margin-left:auto;text-align:right}
+}
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true"></div>
+<div class="wrap">
+
+  <header class="mast">
+    <div class="logo"><span class="pi">π</span><span class="word">Hunter</span></div>
+    <p class="sub">The digits of pi, computed live in your browser — hunting for the exact number or word you type.</p>
+    <span class="badge">live computation · unbounded spigot</span>
+  </header>
+
+  <section class="card" aria-label="search controls">
+    <div class="hunt">
+      <div class="inputrow">
+        <input id="phrase" type="text" inputmode="text" autocomplete="off" spellcheck="false"
+               placeholder="Type digits or a word — e.g. 1998, 314159, DOUBAO" aria-label="Phrase to find in pi">
+        <button id="go" class="btn">Start hunt</button>
+        <button id="stop" class="btn secondary" hidden>Stop</button>
+      </div>
+      <div class="resolved" id="resolved"></div>
+    </div>
+    <div class="row2">
+      <div class="seg" role="group" aria-label="Color mode">
+        <button id="m-color" aria-pressed="true">Color</button>
+        <button id="m-bw" aria-pressed="false">Black &amp; white</button>
+      </div>
+      <div class="seg" role="group" aria-label="Digit display">
+        <button id="m-digits" aria-pressed="true">Digits</button>
+        <button id="m-letters" aria-pressed="false">Numbers → letters</button>
+      </div>
+      <label class="hint" for="cap">Search depth
+        <select id="cap">
+          <option value="5000">5,000 digits (≈ 3 s)</option>
+          <option value="20000" selected>20,000 digits (≈ 30 s)</option>
+          <option value="50000">50,000 digits (≈ 5 min)</option>
+          <option value="200000">200,000 digits (long hunt)</option>
+        </select>
+      </label>
+      <p class="hint">Letters convert with A1Z26 (space&nbsp;=&nbsp;0), so <code>DOUBAO</code> → <code>415212115</code>. Display letters map each digit A=0&nbsp;…&nbsp;J=9.</p>
+    </div>
+  </section>
+
+  <section class="stats" aria-label="live statistics">
+    <div class="stat"><div class="k">Digits scanned</div><div class="v" id="s-digits">0</div></div>
+    <div class="stat"><div class="k">Rate</div><div class="v" id="s-rate">—<small> /s</small></div></div>
+    <div class="stat"><div class="k">Elapsed</div><div class="v" id="s-elapsed">0:00</div></div>
+    <div class="stat"><div class="k">Status</div><div class="v" id="s-status"><small>idle</small></div></div>
+  </section>
+
+  <section class="ticker" aria-label="digit stream">
+    <div class="cap"><b id="streamhead">3.</b><span class="st" id="streamstat">waiting for a hunt</span></div>
+    <div class="stream" id="stream" aria-live="polite"></div>
+    <div class="scan" aria-hidden="true"></div>
+  </section>
+
+  <section class="result" id="result" aria-live="assertive">
+    <div class="head"><span class="hl" id="r-found"></span></div>
+    <div class="snippet" id="r-snippet"></div>
+    <div class="actions">
+      <button id="r-deeper" class="btn secondary">Go deeper (larger cap)</button>
+      <button id="r-new" class="btn">New hunt</button>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div class="rule"></div>
+    <p><strong>How it works.</strong> Digits of π are generated on this page by a verified continued-fraction spigot running in a background worker — no server, no precomputed table. The search reads the stream as it is produced and stops the moment your phrase appears.</p>
+    <p><strong>Odds (rough).</strong> Assuming the digits behave like random strings, a random <code>L</code>-digit phrase first appears around <code>10^L</code> digits: 3–4 digit phrases usually land inside the small caps; 5-digit phrases sometimes need the 50k–200k hunts; 6+ digits will almost never appear in these ranges. Letters become longer digit strings, so short words are the realistic targets.</p>
+    <p>Reference digits: <code>3.14159 26535 89793 23846 26433 83279 50288 41971 69399 37510 58209 7494 …</code></p>
+  </footer>
+</div>
+
+<script>
+/* ================= worker: continued-fraction spigot ================= */
+var WORKER_SRC = [
+"var running=false,count=0;",
+"self.onmessage=function(e){",
+"  if(e.data.type==='start'){ if(!running) run(e.data.cap); }",
+"  else if(e.data.type==='stop'){ running=false; }",
+"};",
+"function run(cap){",
+"  running=true; count=0;",
+"  var k=2n,a=4n,b=1n,a1=12n,b1=4n;",
+"  var out=[];",
+"  var tick=function(){",
+"    if(!running){ return; }",
+"    while(out.length<256 && count<cap){",
+"      var p=k*k, q=2n*k+1n; k+=1n;",
+"      var na=a1, nb=b1;",
+"      a1=p*a+q*a1; b1=p*b+q*b1;",
+"      a=na; b=nb;",
+"      var d=a/b, d1=a1/b1;",
+"      while(d===d1 && count<cap){",
+"        out.push(Number(d)); count++;",
+"        if(out.length>=256){ break; }",
+"        a=10n*(a%b); a1=10n*(a1%b1);",
+"        d=a/b; d1=a1/b1;",
+"      }",
+"    }",
+"    if(out.length){",
+"      self.postMessage({type:'chunk', digits:out});",
+"      out=[];",
+"    }",
+"    if(!running){ return; }",
+"    if(count>=cap){ running=false; self.postMessage({type:'done', count:count}); return; }",
+"    setTimeout(tick,0);",
+"  };",
+"  tick();",
+"};"
+].join("\n");
+
+var worker = null;
+var streamStr = "";
+var count = 0;
+var cap = 20000;
+var target = "";
+var running = false;
+var startTime = 0;
+var lastChunkTime = 0;
+var lastChunkLen = 0;
+var rate = 0;
+var foundPos = -1;
+var stopRequested = false;
+var finished = false;
+
+/* ================= element refs ================= */
+var elPhrase = document.getElementById('phrase');
+var elGo = document.getElementById('go');
+var elStop = document.getElementById('stop');
+var elCap = document.getElementById('cap');
+var elResolved = document.getElementById('resolved');
+var elStream = document.getElementById('stream');
+var elHead = document.getElementById('streamhead');
+var elStreamStat = document.getElementById('streamstat');
+var elSD = document.getElementById('s-digits');
+var elSR = document.getElementById('s-rate');
+var elSE = document.getElementById('s-elapsed');
+var elSS = document.getElementById('s-status');
+var elResult = document.getElementById('result');
+var elRFound = document.getElementById('r-found');
+var elRSnip = document.getElementById('r-snippet');
+
+var displayMode = 'color';     // 'color' | 'bw'
+var letterMode = false;        // digits -> letters display
+
+/* ================= phrase conversion (A1Z26) ================= */
+function phraseToDigits(raw){
+  var up = (raw||'').toUpperCase();
+  var out = "";
+  for (var i=0;i<up.length;i++){
+    var c = up.charCodeAt(i);
+    if (up[i] >= '0' && up[i] <= '9'){ out += up[i]; }
+    else if (up[i] === ' '){ out += '0'; }
+    else if (c >= 65 && c <= 90){ out += String(c - 64); }
+  }
+  return out;
+}
+function digitToLetter(d){ return String.fromCharCode(65 + d); }  // 0->A ... 9->J
+
+/* ================= worker control ================= */
+function spawnWorker(){
+  if (worker) worker.terminate();
+  var blob = new Blob([WORKER_SRC], {type:'application/javascript'});
+  worker = new Worker(URL.createObjectURL(blob));
+  worker.onmessage = onWorkerMsg;
+  worker.onerror = function(){
+    if (running && !finished){
+      finished = true;
+      running = false;
+      document.body.classList.remove('running');
+      elStop.hidden = true;
+      elGo.disabled = false;
+      elSS.innerHTML = '<small>worker error</small>';
+      elStreamStat.textContent = 'computation failed — try again';
+      clearInterval(clockTimer);
+    }
+  };
+}
+function startHunt(){
+  var digits = phraseToDigits(elPhrase.value);
+  if (!digits){ flashInput(); return; }
+  target = digits;
+  finished = false;
+  stopRequested = false;
+  elResolved.style.display = 'block';
+  elResolved.innerHTML = 'Hunting for digits: <span id="target-inline"></span>';
+  var shown = elPhrase.value.trim();
+  document.getElementById('target-inline').textContent = digits + '  ← ' + shown;
+  if (digits.length > cap){
+    elResolved.innerHTML += ' <span style="color:var(--warn)">(phrase longer than the cap — cannot appear; raise the search depth)</span>';
+  }
+  resetRun();
+  spawnWorker();
+  worker.postMessage({type:'start', cap:cap});
+  running = true;
+  startTime = performance.now();
+  lastChunkTime = startTime;
+  lastChunkLen = 0;
+  rate = 0;
+  foundPos = -1;
+  document.body.classList.add('running');
+  elStop.hidden = false;
+  elGo.disabled = true;
+  elSS.innerHTML = '<small>computing…</small>';
+  elResult.classList.remove('on');
+  elStreamStat.textContent = 'searching for ' + digits;
+}
+function resetRun(){
+  streamStr = "";
+  count = 0;
+  elStream.innerHTML = "";
+  elHead.textContent = "3.";
+  elSD.textContent = "0";
+  elSE.textContent = "0:00";
+  elSR.textContent = "—";
+  clearInterval(clockTimer);
+  clockTimer = setInterval(updateClock, 200);
+}
+function stopHunt(){
+  stopRequested = true;
+  finished = true;
+  if (worker){ worker.postMessage({type:'stop'}); }
+  running = false;
+  document.body.classList.remove('running');
+  elStop.hidden = true;
+  elGo.disabled = false;
+  elSS.innerHTML = '<small>stopped at ' + count.toLocaleString() + ' digits</small>';
+  elStreamStat.textContent = 'stopped';
+  clearInterval(clockTimer);
+}
+var clockTimer = null;
+function updateClock(){
+  var s = Math.round((performance.now() - startTime)/1000);
+  elSE.textContent = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+
+/* ================= worker message ================= */
+function onWorkerMsg(e){
+  var d = e.data;
+  if (d.type === 'chunk'){
+    appendDigits(d.digits);
+    updateRate(d.digits.length);
+  } else if (d.type === 'done'){
+    if (running && !stopRequested){
+      // cap reached without finding (or found flag separately)
+      if (foundPos < 0){ onExhausted(); }
+    }
+  }
+}
+function updateRate(n){
+  var now = performance.now();
+  var dt = (now - lastChunkTime)/1000;
+  if (dt > 0){
+    rate = 0.7*rate + 0.3*(n/dt);
+    lastChunkTime = now;
+  }
+  elSR.textContent = Math.round(rate).toLocaleString();
+}
+
+/* ================= stream append + search ================= */
+function appendDigits(arr){
+  var s = arr.join('');
+  streamStr += s;
+  count += arr.length;
+  elSD.textContent = count.toLocaleString();
+  // windowed search on the new tail
+  if (foundPos < 0 && target){
+    var L = target.length;
+    var from = Math.max(0, streamStr.length - L - arr.length + 1);
+    var idx = streamStr.indexOf(target, from);
+    if (idx >= 0){
+      foundPos = idx;
+      onFound();
+    }
+  }
+  renderTiles(arr);
+}
+function renderTiles(arr){
+  var frag = document.createDocumentFragment();
+  for (var i=0;i<arr.length;i++){
+    var tile = document.createElement('span');
+    tile.className = 'tile';
+    tile.textContent = arr[i];
+    if (letterMode){
+      var l = document.createElement('span');
+      l.className = 'ltr';
+      l.textContent = digitToLetter(arr[i]);
+      tile.appendChild(l);
+    }
+    frag.appendChild(tile);
+  }
+  elStream.appendChild(frag);
+  // trim to last 480 tiles
+  while (elStream.children.length > 480){
+    elStream.removeChild(elStream.firstChild);
+  }
+  elStream.scrollTop = elStream.scrollHeight;
+}
+
+/* ================= found / exhausted ================= */
+function onFound(){
+  running = false;
+  stopRequested = false;
+  finished = true;
+  if (worker){ worker.postMessage({type:'stop'}); }
+  document.body.classList.remove('running');
+  elStop.hidden = true;
+  elGo.disabled = false;
+  elSS.innerHTML = '<small>found</small>';
+  var pos1 = foundPos + 1;
+  elRFound.innerHTML = 'FOUND at digit ' + pos1.toLocaleString() + '<small>“' + target + '” appears in π at position ' + pos1 + ' (counting from 3.1…)</small>';
+  // snippet
+  var from = Math.max(0, foundPos - 12);
+  var to = Math.min(streamStr.length, foundPos + target.length + 12);
+  var pre = streamStr.slice(from, foundPos);
+  var hit = streamStr.substr(foundPos, target.length);
+  var post = streamStr.slice(foundPos + target.length, to);
+  var lead = (from === 0) ? '' : '…';
+  var trail = (to >= streamStr.length) ? '' : '…';
+  elRSnip.innerHTML = lead + pre + '<span class="hit">' + hit + '</span>' + post + trail;
+  // highlight tiles in stream
+  highlightTiles();
+  elResult.classList.add('on');
+  elStreamStat.textContent = 'found at digit ' + pos1.toLocaleString();
+  clearInterval(clockTimer);
+}
+function highlightTiles(){
+  var tiles = elStream.querySelectorAll('.tile');
+  // tiles cover the tail of the stream; locate the visible subset containing foundPos
+  var totalShown = streamStr.length;           // all digits ever streamed
+  var trimmed = count - tiles.length;          // digits trimmed from the head
+  for (var i=0;i<tiles.length;i++){
+    var pos = trimmed + i;
+    if (pos >= foundPos && pos < foundPos + target.length){
+      tiles[i].classList.add('found');
+    }
+  }
+}
+function onExhausted(){
+  if (finished) return;
+  running = false;
+  stopRequested = false;
+  finished = true;
+  if (worker){ worker.postMessage({type:'stop'}); }
+  document.body.classList.remove('running');
+  elStop.hidden = true;
+  elGo.disabled = false;
+  elSS.innerHTML = '<small>cap reached</small>';
+  elStreamStat.textContent = 'not found within ' + cap.toLocaleString() + ' digits';
+  elRFound.innerHTML = 'NOT FOUND within ' + cap.toLocaleString() + ' digits<small>“' + target + '” did not appear in the first ' + count.toLocaleString() + ' digits. A random L-digit string first appears around 10^L digits — this phrase may need a deeper hunt or a shorter phrase.</small>';
+  elRSnip.textContent = '';
+  elResult.classList.add('on');
+  clearInterval(clockTimer);
+}
+function goDeeper(){
+  cap = Math.min(cap * 4, 500000);
+  elCap.value = String(cap);
+  finished = false;
+  stopRequested = false;
+  resetRun();
+  spawnWorker();
+  worker.postMessage({type:'start', cap:cap});
+  running = true;
+  startTime = performance.now();
+  lastChunkTime = startTime; lastChunkLen = 0; rate = 0;
+  document.body.classList.add('running');
+  elStop.hidden = false;
+  elGo.disabled = true;
+  elSS.innerHTML = '<small>computing…</small>';
+  elResult.classList.remove('on');
+  elStreamStat.textContent = 'deeper hunt · ' + cap.toLocaleString() + ' digits';
+}
+function flashInput(){
+  elPhrase.style.borderColor = 'var(--warn)';
+  setTimeout(function(){ elPhrase.style.borderColor = ''; }, 900);
+}
+
+/* ================= mode toggles ================= */
+function setColorMode(m){
+  displayMode = m;
+  document.documentElement.classList.toggle('bw', m === 'bw');
+  document.getElementById('m-color').setAttribute('aria-pressed', String(m === 'color'));
+  document.getElementById('m-bw').setAttribute('aria-pressed', String(m === 'bw'));
+}
+function setLetterMode(on){
+  letterMode = on;
+  document.getElementById('m-digits').setAttribute('aria-pressed', String(!on));
+  document.getElementById('m-letters').setAttribute('aria-pressed', String(on));
+  reletterTiles();
+}
+function reletterTiles(){
+  var tiles = elStream.querySelectorAll('.tile');
+  for (var i=0;i<tiles.length;i++){
+    var tile = tiles[i];
+    var old = tile.querySelector('.ltr');
+    if (old) old.remove();
+    if (letterMode){
+      var l = document.createElement('span');
+      l.className = 'ltr';
+      l.textContent = digitToLetter(tile.firstChild.textContent);
+      tile.appendChild(l);
+    }
+  }
+}
+document.getElementById('m-color').addEventListener('click', function(){ setColorMode('color'); });
+document.getElementById('m-bw').addEventListener('click', function(){ setColorMode('bw'); });
+document.getElementById('m-digits').addEventListener('click', function(){ setLetterMode(false); });
+document.getElementById('m-letters').addEventListener('click', function(){ setLetterMode(true); });
+
+/* ================= buttons ================= */
+elGo.addEventListener('click', startHunt);
+elStop.addEventListener('click', stopHunt);
+document.getElementById('r-deeper').addEventListener('click', goDeeper);
+document.getElementById('r-new').addEventListener('click', function(){
+  elResult.classList.remove('on');
+  elPhrase.focus();
+  if (running) stopHunt();
+});
+elPhrase.addEventListener('keydown', function(e){
+  if (e.key === 'Enter'){ startHunt(); }
+});
+elCap.addEventListener('change', function(){
+  cap = parseInt(elCap.value, 10) || 20000;
+  if (!running){
+    elStreamStat.textContent = 'depth: ' + cap.toLocaleString() + ' digits';
+  }
+});
+
+/* live resolved preview */
+elPhrase.addEventListener('input', function(){
+  var digits = phraseToDigits(elPhrase.value);
+  if (digits){
+    elResolved.style.display = 'block';
+    elResolved.innerHTML = 'Hunting for digits: <span id="target-inline"></span>';
+    document.getElementById('target-inline').textContent = digits;
+  } else {
+    elResolved.style.display = 'none';
+  }
+});
+
+/* init */
+elStreamStat.textContent = 'depth: ' + cap.toLocaleString() + ' digits · say or type a phrase and hunt';
+</script>
+</body>
+</html>
